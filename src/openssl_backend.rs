@@ -295,6 +295,11 @@ impl Bn {
         self.0.num_bits() == 1 && self.0.is_bit_set(0)
     }
 
+    /// Return the bit length
+    pub fn bit_length(&self) -> usize {
+        self.0.num_bits() as usize
+    }
+
     /// Compute the greatest common divisor
     pub fn gcd(&self, other: &Bn) -> Self {
         let mut bn = BigNum::new().unwrap();
@@ -406,7 +411,7 @@ impl Bn {
 #[test]
 fn safe_prime() {
     let n = Bn::safe_prime(1024);
-    assert_eq!(n.0.num_bits(), 1024);
+    assert_eq!(n.bit_length(), 1024);
     assert!(n.is_prime());
     let sg: Bn = n >> 1;
     assert!(sg.is_prime())

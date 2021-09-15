@@ -162,7 +162,7 @@ fn prime() {
     let p = BigNumber::prime(1024);
     assert!(p.is_prime());
     let s = p.to_string().len();
-    assert!(308 <= s && s <= 309);
+    assert!(s <= 309);
 }
 
 #[test]
