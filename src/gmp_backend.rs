@@ -375,6 +375,7 @@ impl Drop for MpzMpz {
     }
 }
 
+#[allow(clippy::uninit_assumed_init)]
 impl Default for MpzMpz {
     fn default() -> MpzMpz {
         unsafe {
