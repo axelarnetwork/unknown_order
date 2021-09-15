@@ -269,6 +269,49 @@ impl Bn {
         }
     }
 
+    /// Generate a safe prime with `size - 1` or `size` bits using a user-provided rng
+    pub fn fast_safe_prime_with_rng(rng: &mut (impl CryptoRng + RngCore), bitsize: usize) -> Self {
+        let mut p = _random_nbit(rng, bitsize - 1);
+
+        // Set the MSB bit so that we're sampling from [2^(size - 2), 2^(size - 1))
+        p.setbit(bitsize - 2);
+
+        loop {
+            // TODO: Safe primes are 2 (mod 3). We don't need to generate primes that are 1 (mod 3)
+            // orig_p
+            p = p.nextprime();
+
+            // 2 orig_p + 1
+            p <<= 1;
+            p += 1;
+
+            // Keep the number of Miller-Rabin rounds high since
+            // a non-negligible false positive will affect key recovery
+            if let ProbabPrimeResult::Prime | ProbabPrimeResult::ProbablyPrime = p.probab_prime(25)
+            {
+                return Self(p);
+            }
+
+            // Skip the following if (orig_p - 1)/2 is even
+            if !p.tstbit(2) {
+                p >>= 1;
+                continue;
+            }
+
+            // (orig_p - 1)/2
+            p >>= 2;
+            let is_prime_res = p.probab_prime(25);
+
+            // orig_p
+            p <<= 1;
+            p += 1;
+
+            if let ProbabPrimeResult::Prime | ProbabPrimeResult::ProbablyPrime = is_prime_res {
+                return Self(p);
+            }
+        }
+    }
+
     /// Generate a prime with `size` bits
     pub fn prime(size: usize) -> Self {
         let mut rng = rand::thread_rng();
@@ -388,6 +431,27 @@ fn safe_prime() {
     let sg: Bn = &m >> 1;
     assert!(sg.is_prime());
     assert_ne!(n, m);
+
+    use rand::SeedableRng;
+
+    let seed = [10; 32];
+    let size = 512;
+    let mut rng = rand::rngs::StdRng::from_seed(seed);
+    let p1 = Bn::prime_with_rng(&mut rng, size);
+    let p2 = Bn::safe_prime_with_rng(&mut rng, size);
+    let p3 = Bn::fast_safe_prime_with_rng(&mut rng, size);
+
+    rng = rand::rngs::StdRng::from_seed(seed);
+    let q1 = Bn::prime_with_rng(&mut rng, size);
+    let q2 = Bn::safe_prime_with_rng(&mut rng, size);
+    let q3 = Bn::fast_safe_prime_with_rng(&mut rng, size);
+    assert_eq!(p1, q1);
+    assert_eq!(p2, q2);
+    assert_eq!(p3, q3);
+
+    assert!(p1.bit_length() == size || p1.bit_length() == size - 1);
+    assert!(p2.bit_length() == size || p2.bit_length() == size - 1);
+    assert!(p3.bit_length() == size || p3.bit_length() == size - 1);
 }
 
 #[test]
