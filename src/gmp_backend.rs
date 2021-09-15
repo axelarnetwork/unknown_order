@@ -4,7 +4,7 @@
 */
 use crate::{get_mod, GcdResult};
 use gmp::mpz::{Mpz, ProbabPrimeResult};
-use rand::RngCore;
+use rand::{CryptoRng, RngCore};
 use serde::{
     de::{Error as DError, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -176,6 +176,11 @@ impl Bn {
         self.0 == Mpz::one()
     }
 
+    /// Return the bit length
+    pub fn bit_length(&self) -> usize {
+        self.0.bit_length()
+    }
+
     /// Compute the greatest common divisor
     pub fn gcd(&self, other: &Bn) -> Self {
         Self(self.0.gcd(&other.0))
@@ -189,9 +194,10 @@ impl Bn {
     /// Generate a random value less than `n`
     pub fn random(n: &Self) -> Self {
         let size = n.0.bit_length();
+        let mut rng = rand::thread_rng();
 
         loop {
-            let b = _random_nbit(size);
+            let b = _random_nbit(&mut rng, size);
 
             if b < n.0 {
                 return Self(b);
@@ -236,7 +242,14 @@ impl Bn {
 
     /// Generate a safe prime with `size` bits
     pub fn safe_prime(size: usize) -> Self {
-        let mut p = _random_nbit(size - 1);
+        let mut rng = rand::thread_rng();
+
+        Self::safe_prime_with_rng(&mut rng, size)
+    }
+
+    /// Generate a safe prime with `size` bits
+    pub fn safe_prime_with_rng(rng: &mut (impl CryptoRng + RngCore), size: usize) -> Self {
+        let mut p = _random_nbit(rng, size - 1);
 
         // Set the MSB bit so that we're sampling from [2^(size - 2), 2^(size - 1))
         p.setbit(size - 2);
@@ -258,7 +271,14 @@ impl Bn {
 
     /// Generate a prime with `size` bits
     pub fn prime(size: usize) -> Self {
-        let mut p = _random_nbit(size);
+        let mut rng = rand::thread_rng();
+
+        Self::prime_with_rng(&mut rng, size)
+    }
+
+    /// Generate a prime with `size` bits with a user-provided rng
+    pub fn prime_with_rng(rng: &mut (impl CryptoRng + RngCore), size: usize) -> Self {
+        let mut p = _random_nbit(rng, size);
 
         // Set the MSB bit so that we're sampling from [2^(size - 1), 2^size)
         p.setbit(size - 1);
@@ -342,11 +362,9 @@ fn _div_rem(lhs: &Mpz, rhs: &Mpz) -> (Mpz, Mpz) {
 }
 
 /// Sample a bignum from [0, 2^size)
-fn _random_nbit(size: usize) -> Mpz {
+fn _random_nbit(rng: &mut (impl CryptoRng + RngCore), size: usize) -> Mpz {
     let len = (size + 7) / 8;
     let mut buf = vec![0u8; len];
-
-    let mut rng = rand::thread_rng();
 
     rng.fill_bytes(&mut buf);
 
@@ -359,13 +377,13 @@ fn _random_nbit(size: usize) -> Mpz {
 #[test]
 fn safe_prime() {
     let n = Bn::safe_prime(1024);
-    assert_eq!(n.0.bit_length(), 1024);
+    assert_eq!(n.bit_length(), 1024);
     assert!(n.is_prime());
     let sg: Bn = &n >> 1;
     assert!(sg.is_prime());
     // Make sure it doesn't produce the same prime when called twice
     let m = Bn::safe_prime(1024);
-    assert_eq!(m.0.bit_length(), 1024);
+    assert_eq!(m.bit_length(), 1024);
     assert!(m.is_prime());
     let sg: Bn = &m >> 1;
     assert!(sg.is_prime());
