@@ -234,7 +234,7 @@ impl Bn {
         debug_assert!(self >= &Self::zero());
 
         if self < &Self::zero() {
-            return vec![0]
+            return vec![0];
         }
 
         let mut s = self.0.to_str_radix(16);
