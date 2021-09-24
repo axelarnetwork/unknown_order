@@ -245,11 +245,14 @@ impl Bn {
 
         let mut s = self.0.to_str_radix(16);
 
+        // Prepend a 0 if hex string is of odd length
         if s.len() & 1 == 1 {
             s = format!("0{}", s);
         }
 
-        // TODO: Use a bad default instead of panic. This should be replaced with a nicer function
+        // TODO: Use a bad default instead of panic.
+        // This to_bytes method should really be replaced with
+        // a function that can't panic without returning bad inputs
         hex::decode(&s).unwrap_or_else(|_| vec![0])
     }
 
