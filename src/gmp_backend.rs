@@ -193,11 +193,25 @@ impl Bn {
 
     /// Generate a random value less than `n`
     pub fn random(n: &Self) -> Self {
-        let size = n.0.bit_length();
         let mut rng = rand::thread_rng();
 
+        Self::random_with_rng(&mut rng, n)
+    }
+
+    /// Generate a random value less than `n` with the provided `rng`
+    pub fn random_with_rng(rng: &mut (impl CryptoRng + RngCore), n: &Self) -> Self {
+        let zero = Self::zero();
+
+        debug_assert!(n > &zero);
+
+        if n <= &zero {
+            return zero;
+        }
+
+        let size = n.0.bit_length();
+
         loop {
-            let b = _random_nbit(&mut rng, size);
+            let b = _random_nbit(rng, size);
 
             if b < n.0 {
                 return Self(b);
@@ -223,11 +237,23 @@ impl Bn {
 
     /// Convert this big number to a big-endian byte sequence
     pub fn to_bytes(&self) -> Vec<u8> {
+        debug_assert!(self >= &Self::zero());
+
+        if self < &Self::zero() {
+            return vec![0];
+        }
+
         let mut s = self.0.to_str_radix(16);
+
+        // Prepend a 0 if hex string is of odd length
         if s.len() & 1 == 1 {
             s = format!("0{}", s);
         }
-        hex::decode(&s).unwrap()
+
+        // TODO: Use a bad default instead of panic.
+        // This to_bytes method should really be replaced with
+        // a function that can't panic without returning bad inputs
+        hex::decode(&s).unwrap_or_else(|_| vec![0])
     }
 
     /// Compute the extended euclid algorithm and return the Bézout coefficients and GCD
@@ -437,19 +463,27 @@ fn safe_prime() {
 
     let seed = [10; 32];
     let size = 512;
+    let num = Bn::from_slice(seed);
     let mut rng = rand::rngs::StdRng::from_seed(seed);
+
+    let r = Bn::random_with_rng(&mut rng, &num);
     let p1 = Bn::prime_with_rng(&mut rng, size);
     let p2 = Bn::safe_prime_with_rng(&mut rng, size);
     let p3 = Bn::fast_safe_prime_with_rng(&mut rng, size);
 
     rng = rand::rngs::StdRng::from_seed(seed);
+    let rr = Bn::random_with_rng(&mut rng, &num);
     let q1 = Bn::prime_with_rng(&mut rng, size);
     let q2 = Bn::safe_prime_with_rng(&mut rng, size);
     let q3 = Bn::fast_safe_prime_with_rng(&mut rng, size);
+
+    assert_eq!(r, rr);
     assert_eq!(p1, q1);
     assert_eq!(p2, q2);
     assert_eq!(p3, q3);
 
+    assert!(r.bit_length() <= num.bit_length());
+    assert!(rr.bit_length() <= num.bit_length());
     assert!(p1.bit_length() == size || p1.bit_length() == size - 1);
     assert!(p2.bit_length() == size || p2.bit_length() == size - 1);
     assert!(p3.bit_length() == size || p3.bit_length() == size - 1);
