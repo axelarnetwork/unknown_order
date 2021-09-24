@@ -249,7 +249,7 @@ impl Bn {
             s = format!("0{}", s);
         }
 
-        // Use a bad default instead of panic. This should be replaced with a nicer function
+        // TODO: Use a bad default instead of panic. This should be replaced with a nicer function
         hex::decode(&s).unwrap_or_else(|_| vec![0])
     }
 
