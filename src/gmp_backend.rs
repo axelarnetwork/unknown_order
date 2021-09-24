@@ -193,6 +193,13 @@ impl Bn {
 
     /// Generate a random value less than `n`
     pub fn random(n: &Self) -> Self {
+        let mut rng = rand::thread_rng();
+
+        Self::random_with_rng(&mut rng, n)
+    }
+
+    /// Generate a random value less than `n` with the provided `rng`
+    pub fn random_with_rng(rng: &mut (impl CryptoRng + RngCore), n: &Self) -> Self {
         let zero = Self::zero();
 
         debug_assert!(n > &zero);
@@ -202,10 +209,9 @@ impl Bn {
         }
 
         let size = n.0.bit_length();
-        let mut rng = rand::thread_rng();
 
         loop {
-            let b = _random_nbit(&mut rng, size);
+            let b = _random_nbit(rng, size);
 
             if b < n.0 {
                 return Self(b);
@@ -454,19 +460,27 @@ fn safe_prime() {
 
     let seed = [10; 32];
     let size = 512;
+    let num = Bn::from_slice(seed);
     let mut rng = rand::rngs::StdRng::from_seed(seed);
+
+    let r = Bn::random_with_rng(&mut rng, &num);
     let p1 = Bn::prime_with_rng(&mut rng, size);
     let p2 = Bn::safe_prime_with_rng(&mut rng, size);
     let p3 = Bn::fast_safe_prime_with_rng(&mut rng, size);
 
     rng = rand::rngs::StdRng::from_seed(seed);
+    let rr = Bn::random_with_rng(&mut rng, &num);
     let q1 = Bn::prime_with_rng(&mut rng, size);
     let q2 = Bn::safe_prime_with_rng(&mut rng, size);
     let q3 = Bn::fast_safe_prime_with_rng(&mut rng, size);
+
+    assert_eq!(r, rr);
     assert_eq!(p1, q1);
     assert_eq!(p2, q2);
     assert_eq!(p3, q3);
 
+    assert!(r.bit_length() <= num.bit_length());
+    assert!(rr.bit_length() <= num.bit_length());
     assert!(p1.bit_length() == size || p1.bit_length() == size - 1);
     assert!(p2.bit_length() == size || p2.bit_length() == size - 1);
     assert!(p3.bit_length() == size || p3.bit_length() == size - 1);

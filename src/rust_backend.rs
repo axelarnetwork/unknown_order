@@ -224,6 +224,12 @@ impl Bn {
     /// Generate a random value less than `n`
     pub fn random(n: &Self) -> Self {
         let mut rng = rand::thread_rng();
+
+        Self::random_with_rng(&mut rng, n)
+    }
+
+    /// Generate a random value less than `n` with the provided `rng`
+    pub fn random_with_rng(rng: &mut (impl CryptoRng + RngCore), n: &Self) -> Self {
         let len = (n.0.bits() - 1) / 8;
         let mut t = vec![0u8; len as usize];
         loop {
