@@ -6,7 +6,7 @@ use crate::{get_mod, GcdResult};
 use gmp::mpz::{Mpz, ProbabPrimeResult};
 use rand::{CryptoRng, RngCore};
 use serde::{
-    de::{Error as DError, Unexpected, Visitor},
+    de::{Error as DError, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::{
@@ -60,10 +60,7 @@ from_impl!(|d: i32| from_isize(d as isize), i32);
 from_impl!(|d: i16| from_isize(d as isize), i16);
 from_impl!(|d: i8| from_isize(d as isize), i8);
 iter_impl!();
-serdes_impl!(
-    |b: &Bn| b.0.to_str_radix(16),
-    |s: &str| Mpz::from_str_radix(s, 16)
-);
+serdes_impl!(|b: &Bn| (&b.0).into(), |s: &[u8]| Mpz::from(s));
 zeroize_impl!(|b: &mut Bn| b.0 -= b.0.clone());
 
 binops_impl!(Add, add, AddAssign, add_assign, +, +=);
@@ -237,6 +234,13 @@ impl Bn {
 
     /// Convert this big number to a big-endian byte sequence
     pub fn to_bytes(&self) -> Vec<u8> {
+        debug_assert!(self >= &Self::zero());
+
+        (&self.0).into()
+    }
+
+    /// Convert this big number to a big-endian byte sequence
+    pub fn to_signed_bytes(&self) -> Vec<u8> {
         debug_assert!(self >= &Self::zero());
 
         if self < &Self::zero() {

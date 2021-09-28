@@ -220,8 +220,8 @@ macro_rules! serdes_impl {
             where
                 S: Serializer,
             {
-                let str = $ser(self);
-                serializer.serialize_str(&str)
+                let bytes: Vec<u8> = $ser(self);
+                serializer.serialize_bytes(&bytes)
             }
         }
 
@@ -239,17 +239,16 @@ macro_rules! serdes_impl {
                         write!(f, "a hex encoded string")
                     }
 
-                    fn visit_str<E>(self, s: &str) -> Result<Bn, E>
+                    fn visit_bytes<E>(self, s: &[u8]) -> Result<Self::Value, E>
                     where
                         E: DError,
                     {
-                        let b = $des(s)
-                            .map_err(|_| DError::invalid_value(Unexpected::Str(s), &self))?;
+                        let b = $des(s);
                         Ok(Bn(b))
                     }
                 }
 
-                deserializer.deserialize_str(BnVisitor)
+                deserializer.deserialize_bytes(BnVisitor)
             }
         }
     };
