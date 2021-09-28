@@ -139,22 +139,23 @@ fn clone_negative() {
 #[test]
 fn serialize() {
     let n = b10(TEST_PRIMES[2]);
-    let res = serde_json::to_string(&n);
+    let res = bincode::serialize(&n);
     assert!(res.is_ok());
     let s = res.unwrap();
-    let nn_res = serde_json::from_str::<BigNumber>(&s);
+    let nn_res = bincode::deserialize::<BigNumber>(&s);
     assert!(nn_res.is_ok());
     assert_eq!(nn_res.unwrap(), n);
 
     let n = -BigNumber::from(1);
-    let res = serde_json::to_string(&n);
+    let res = bincode::serialize(&n);
     assert!(res.is_ok());
     let s = res.unwrap();
-    let nn_res = serde_json::from_str::<BigNumber>(&s);
+    let nn_res = bincode::deserialize::<BigNumber>(&s);
     assert!(nn_res.is_ok());
-    assert_eq!(nn_res.unwrap(), n);
+    assert_eq!(-nn_res.unwrap(), n);
 
-    assert!(serde_json::from_str::<BigNumber>(r#""-01""#).is_ok())
+    // bincode uses 8 bytes for the length of the vector
+    assert!(bincode::deserialize::<BigNumber>(&[1, 0, 0, 0, 0, 0, 0, 0, 1]).is_ok())
 }
 
 #[test]

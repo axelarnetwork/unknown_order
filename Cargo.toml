@@ -40,4 +40,4 @@ zeroize = "1.4"
 [dev-dependencies]
 blake2 = "0.9"
 multibase = "0.9"
-serde_json = "1.0"
+bincode = "1.3"
