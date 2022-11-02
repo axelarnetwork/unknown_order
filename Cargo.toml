@@ -19,7 +19,7 @@ version = "0.2.3"
 [features]
 default = ["rust"]
 gmp = ["hex", "rand/default", "rust-gmp"]
-rust = ["glass_pumpkin", "num-bigint", "num-integer", "num-traits", "rand"]
+rust = ["glass_pumpkin", "num-bigint", "num-integer", "num-traits", "rand/getrandom"]
 wasm = ["getrandom", "rand", "wasm-bindgen"]
 
 [dependencies]
