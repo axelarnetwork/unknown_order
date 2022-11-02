@@ -51,7 +51,8 @@ from_impl!(|d: i16| BigInt::from(d), i16);
 from_impl!(|d: i8| BigInt::from(d), i8);
 iter_impl!();
 serdes_impl!(|b: &Bn| b.0.to_bytes_be().1, |s: &[u8]| {
-    BigInt::from_bytes_be()
+    // TODO: this ignores the sign. Fixed in upstream (unknown_order=0.5)
+    BigInt::from_bytes_be(Sign::Plus, s)
 });
 zeroize_impl!(|b: &mut Bn| b.0.set_zero());
 binops_impl!(Add, add, AddAssign, add_assign, +, +=);
