@@ -4,15 +4,12 @@
 */
 use crate::{get_mod, GcdResult};
 use glass_pumpkin::{prime, safe_prime};
-use num_bigint::{BigInt, Sign, ToBigInt};
+use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
-use num_traits::{
-    identities::{One, Zero},
-    Num,
-};
-use rand::RngCore;
+use num_traits::identities::{One, Zero};
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use serde::{
-    de::{Error as DError, Unexpected, Visitor},
+    de::{Error as DError, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::{
@@ -51,7 +48,8 @@ from_impl!(|d: i16| BigInt::from(d), i16);
 from_impl!(|d: i8| BigInt::from(d), i8);
 iter_impl!();
 serdes_impl!(|b: &Bn| b.0.to_bytes_be().1, |s: &[u8]| {
-    BigInt::from_bytes_be()
+    // TODO: this ignores the sign. Fixed in upstream (unknown_order=0.5)
+    BigInt::from_bytes_be(Sign::Plus, s)
 });
 zeroize_impl!(|b: &mut Bn| b.0.set_zero());
 binops_impl!(Add, add, AddAssign, add_assign, +, +=);
@@ -223,20 +221,24 @@ impl Bn {
 
     /// Generate a random value less than `n`
     pub fn random(n: &Self) -> Self {
-        let mut rng = rand::thread_rng();
-
-        Self::random_with_rng(&mut rng, n)
+        Self::random_with_rng(&mut OsRng, n)
     }
 
     /// Generate a random value less than `n` with the provided `rng`
     pub fn random_with_rng(rng: &mut (impl CryptoRng + RngCore), n: &Self) -> Self {
-        let len = (n.0.bits() - 1) / 8;
-        let mut t = vec![0u8; len as usize];
+        let bits = n.0.bits() as usize;
+        let len_bytes = (bits - 1) / 8 + 1;
+        let high_bits = len_bytes * 8 - bits;
+        let mut t = vec![0u8; len_bytes as usize];
         loop {
             rng.fill_bytes(&mut t);
-            let b = BigInt::from_bytes_be(Sign::Plus, &t);
-            if b < n.0 {
-                return Self(b);
+            if high_bits > 0 {
+                t[0] &= u8::MAX >> high_bits;
+            }
+            let b = BigUint::from_bytes_be(&t);
+            let res = Self(b.into());
+            if res.0 < n.0 {
+                return res;
             }
         }
     }
@@ -300,16 +302,34 @@ impl Bn {
         }
     }
 
-    /// Generate a safe prime with `size` bits
-    pub fn safe_prime(size: usize) -> Self {
-        let p = safe_prime::new(size).unwrap();
-        Self(p.to_bigint().unwrap())
-    }
-
     /// Generate a prime with `size` bits
     pub fn prime(size: usize) -> Self {
-        let p = prime::new(size).unwrap();
-        Self(p.to_bigint().unwrap())
+        Self::prime_with_rng(&mut OsRng, size)
+    }
+
+    /// Generate a safe prime with `size` bits
+    pub fn safe_prime(size: usize) -> Self {
+        Self::safe_prime_with_rng(&mut OsRng, size)
+    }
+
+    /// Generate a prime with `size` bits with a user-provided rng
+    pub fn prime_with_rng(rng: &mut (impl CryptoRng + RngCore), size: usize) -> Self {
+        let p = prime::from_rng(size, rng).unwrap();
+        Self(p.into())
+    }
+
+    /// Generate a safe prime with `size` bits
+    pub fn safe_prime_with_rng(rng: &mut (impl CryptoRng + RngCore), bitsize: usize) -> Self {
+        let p = safe_prime::from_rng(bitsize, rng).unwrap();
+        Self(p.into())
+    }
+
+    /// Generate a safe prime with `size - 1` or `size` bits using a user-provided rng
+    pub fn fast_safe_prime_with_rng(rng: &mut (impl CryptoRng + RngCore), bitsize: usize) -> Self {
+        // Since the bitsize here is relaxed, we could implement the same strategy
+        // as in gmp_backend, but it does not seem to lead to any performance improvement.
+        let p = safe_prime::from_rng(bitsize, rng).unwrap();
+        Self(p.into())
     }
 
     /// True if a prime number
@@ -329,9 +349,8 @@ impl Bn {
 
 #[test]
 fn safe_prime() {
-    let n = Bn::safe_prime(128);
-    // TODO: Rust backend samples a prime from (0, 2^(n+1)) and so doesn't guarantee the bit length
-    assert!(n.bit_length() <= 128 + 1);
+    let n = Bn::safe_prime(256);
+    assert!(n.bit_length() == 256);
     assert!(n.is_prime());
     let sg: Bn = n >> 1;
     assert!(sg.is_prime())
